@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-PT" class="h-full bg-black">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeachPro - Evolua seu jogo</title>
+    <!-- Tailwind CSS -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Beach Pro">
+    <link rel="apple-touch-icon" href="icon_mobile.png">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrado com sucesso!', reg))
+                    .catch(err => console.log('Erro ao registrar Service Worker:', err));
+            });
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="min-h-screen text-gray-100 flex flex-col relative bg-black selection:bg-[#D8F22A] selection:text-black">
+
+    <!-- HEADER PRINCIPAL -->
+   <header class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-40 no-print">
+        <div class="flex items-center gap-3">
+            <img src="logo.png" alt="BeachPro" class="h-12 object-contain">
+        </div>
+        
+        <div id="header-actions" class="hidden flex items-center gap-3">
+            <button onclick="window.print()" class="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-lg shadow-cyan-500/10 transition-all active:scale-95">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                Exportar Relatório / PDF
+            </button>
+            <button onclick="voltarParaUpload()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-4 py-2 rounded-xl text-xs font-medium border border-zinc-800 transition-all">
+                Incluir novos dados
+            </button>
+        </div>
+    </header>
+
+    <!-- PÁGINA 1: IMPORTAÇÃO E UPLOAD -->
+    <div id="pagina-upload" class="flex-1 max-w-4xl mx-auto px-6 py-16 flex flex-col items-center justify-center">
+        <div class="text-center max-w-2xl mb-12">
+
+            <h2 class="text-4xl sm:text-5xl font-bold tracking-tight text-white mt-6 mb-4 leading-tight">
+                Evolua seu jogo!
+            </h2>
+            <p class="text-zinc-400 text-sm leading-relaxed">
+                Inclua os dados e veja as principais estatísticas do seu desempenho.
+            </p>
+        </div>
+
+        <div class="w-full max-w-xl mx-auto">
+            <!-- Zona de Drop/Upload Única -->
+            <div id="dropzone" class="bg-black border-2 border-dashed border-zinc-850 hover:border-[#E95F32]/50 rounded-2xl p-12 flex flex-col justify-center items-center text-center transition-all group relative overflow-hidden cursor-pointer shadow-2xl">
+                <div class="bg-zinc-900 p-5 rounded-full mb-5 text-zinc-400 group-hover:text-[#E95F32] transition-colors">
+                    <i data-lucide="file-spreadsheet" class="w-12 h-10"></i>
+                </div>
+                <p class="text-xs text-zinc-400 max-w-xs mb-8 leading-relaxed">
+                    Selecione ou arraste o arquivo de dados para obter as estatísticas do seu jogo
+                </p>
+                <label class="cursor-pointer bg-[#E95F32] hover:bg-[#E95F32] text-black text-xs font-bold py-3.5 px-8 rounded-xl transition-all shadow-lg active:scale-95 inline-block">
+                    Selecionar Arquivo
+                    <input id="csv-file-input" type="file" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- PÁGINA 2: DASHBOARD (SEÇÕES REORGANIZADAS COM FILTROS INDIVIDUAIS) -->
+    <div id="pagina-dashboard" class="hidden px-4 sm:px-8 py-8 max-w-7xl mx-auto space-y-12">
+        
+        <!-- Banner de Ficheiro Ativo -->
+        <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row gap-4 items-center justify-between no-print">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
+                    <i data-lucide="file-spreadsheet" class="w-5 h-5 text-[#D8F22A]"></i>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold text-white">Planilha de Análise Ativa</h3>
+                    <p id="filename-display" class="text-[10px] text-zinc-500 font-mono">Nenhum ficheiro</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <span id="badge-linhas" class="text-[10px] bg-zinc-900 text-zinc-300 border border-zinc-800 px-3 py-1 rounded-md">0 lances</span>
+                <span id="badge-jogos" class="text-[10px] bg-zinc-900 text-zinc-300 border border-zinc-800 px-3 py-1 rounded-md font-bold">0 jogos</span>
+            </div>
+        </div>
+
+        <!-- -------------------------------------------------------------------------------------- -->
+        <!-- SEÇÃO 1: ESTATÍSTICAS GERAIS -->
+        <!-- -------------------------------------------------------------------------------------- -->
+        <section id="sec-geral" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 print-section relative overflow-hidden">
+            <div class="absolute right-0 top-0 text-[100px] font-black text-white/[0.01] select-none pointer-events-none uppercase tracking-tighter">
+                Geral
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-black c">01.</span>
+                    <div>
+                        <h2 class="text-base font-bold uppercase tracking-wide text-white">Estatísticas Gerais</h2>
+                        <p class="text-[10px] text-zinc-400">Visão macro geral baseada em filtros de toda a planilha</p>
+                    </div>
+                </div>
+                <span class="text-[9px] bg-[#D8F22A]/10 text-[#D8F22A] px-2.5 py-0.5 rounded border border-[#D8F22A]/20 uppercase font-bold tracking-wider">Visão Macro</span>
+            </div>
+
+            <!-- Filtros Seção 1 -->
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 grid grid-cols-1 sm:grid-cols-5 gap-3 mb-6 no-print">
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Dupla Principal *</label>
+                    <select id="s1-filtro-dupla" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white font-medium focus:outline-none focus:border-[#D8F22A]" onchange="atualizarEstatisticasGerais()">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogador</label>
+                    <select id="s1-filtro-jogador" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasGerais()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogo</label>
+                    <select id="s1-filtro-jogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasGerais()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Tipo de Jogo</label>
+                    <select id="s1-filtro-tipojogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasGerais()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Torneio</label>
+                    <select id="s1-filtro-torneio" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasGerais()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Conteúdo Seção 1 -->
+            <div id="s1-render" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="col-span-full py-8 text-center bg-zinc-900/50 border border-dashed border-zinc-800 rounded-xl">
+                    <p class="text-xs text-zinc-400">Por favor, selecione a <strong class="text-white">Dupla Principal *</strong> nos filtros para calcular estatísticas gerais.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- -------------------------------------------------------------------------------------- -->
+        <!-- SEÇÃO 2: ESTATÍSTICAS DA DUPLA -->
+        <!-- -------------------------------------------------------------------------------------- -->
+        <section id="sec-dupla" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 print-section relative overflow-hidden">
+            <div class="absolute right-0 top-0 text-[100px] font-black text-white/[0.01] select-none pointer-events-none uppercase tracking-tighter">
+                Dupla
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-black text-[#D8F22A]">02.</span>
+                    <div>
+                        <h2 class="text-base font-bold uppercase tracking-wide text-white">Estatísticas da Dupla</h2>
+                        <p class="text-[10px] text-zinc-400">Distribuição de pontos por winners, erros e análises de rali</p>
+                    </div>
+                </div>
+                <span class="text-[9px] bg-cyan-500/10 text-cyan-400 px-2.5 py-0.5 rounded border border-cyan-500/20 uppercase font-bold tracking-wider">Aproveitamento Tático</span>
+            </div>
+
+            <!-- Filtros Seção 2 -->
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 no-print">
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Dupla Principal *</label>
+                    <select id="s2-filtro-dupla" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white font-medium focus:outline-none focus:border-[#D8F22A]" onchange="atualizarEstatisticasDupla()">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogo</label>
+                    <select id="s2-filtro-jogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasDupla()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Torneio</label>
+                    <select id="s2-filtro-torneio" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasDupla()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="s2-render" class="space-y-6">
+                <div class="py-8 text-center bg-zinc-900/50 border border-dashed border-zinc-800 rounded-xl">
+                    <p class="text-xs text-zinc-400">Selecione uma <strong class="text-white">Dupla Principal *</strong> nos filtros desta secção.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- -------------------------------------------------------------------------------------- -->
+        <!-- SEÇÃO 3: ESTATÍSTICAS DO JOGO -->
+        <!-- -------------------------------------------------------------------------------------- -->
+        <section id="sec-jogo" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 print-section relative overflow-hidden">
+            <div class="absolute right-0 top-0 text-[100px] font-black text-white/[0.01] select-none pointer-events-none uppercase tracking-tighter">
+                Versus
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-black text-[#D8F22A]">03.</span>
+                    <div>
+                        <h2 class="text-base font-bold uppercase tracking-wide text-white">Estatísticas do Jogo</h2>
+                        <p class="text-[10px] text-zinc-400">Comparativo bilateral borboleta de desempenho por partida</p>
+                    </div>
+                </div>
+                <span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded border border-emerald-500/20 uppercase font-bold tracking-wider">Bilateral</span>
+            </div>
+
+            <!-- Filtros Seção 3 -->
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 no-print">
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogo Selecionado *</label>
+                    <select id="s3-filtro-jogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white font-medium focus:outline-none focus:border-[#D8F22A]" onchange="atualizarEstatisticasJogo()">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div class="flex items-center text-xs text-zinc-500 pt-4 sm:pt-6">
+                    <i data-lucide="info" class="w-4 h-4 text-[#D8F22A] mr-2 shrink-0"></i>
+                    <span>O sistema analisará automaticamente as duas duplas em court na partida escolhida.</span>
+                </div>
+            </div>
+
+            <div id="s3-render" class="space-y-4">
+                <div class="py-8 text-center bg-zinc-900/50 border border-dashed border-zinc-800 rounded-xl">
+                    <p class="text-xs text-zinc-400">Selecione o <strong class="text-white">Jogo *</strong> para renderizar as barras horizontais comparativas.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- -------------------------------------------------------------------------------------- -->
+        <!-- SEÇÃO 4 & 5: ESTATÍSTICA INDIVIDUAL -->
+        <!-- -------------------------------------------------------------------------------------- -->
+        <section id="sec-individual" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 print-section relative overflow-hidden">
+            <div class="absolute right-0 top-0 text-[100px] font-black text-white/[0.01] select-none pointer-events-none uppercase tracking-tighter">
+                Atleta
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-black text-[#D8F22A]">04.</span>
+                    <div>
+                        <h2 class="text-base font-bold uppercase tracking-wide text-white">Estatística Individual</h2>
+                        <p class="text-[10px] text-zinc-400">Desempenho no saque, erros forçados e aproveitamento de golpes</p>
+                    </div>
+                </div>
+                <span class="text-[9px] bg-purple-500/10 text-purple-400 px-2.5 py-0.5 rounded border border-purple-500/20 uppercase font-bold tracking-wider">Individual</span>
+            </div>
+
+            <!-- Filtros Seção 4 -->
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 no-print">
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogador Selecionado *</label>
+                    <select id="s4-filtro-jogador" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white font-medium focus:outline-none focus:border-[#D8F22A]" onchange="atualizarEstatisticasIndividual()">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogo</label>
+                    <select id="s4-filtro-jogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasIndividual()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Torneio</label>
+                    <select id="s4-filtro-torneio" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasIndividual()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="s4-render" class="space-y-6">
+                <div class="py-8 text-center bg-zinc-900/50 border border-dashed border-zinc-800 rounded-xl">
+                    <p class="text-xs text-zinc-400">Selecione o <strong class="text-white">Jogador *</strong> para calcular métricas de saque e golpes.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- -------------------------------------------------------------------------------------- -->
+        <!-- SEÇÃO 6: ESTATÍSTICAS DE PONTOS IMPORTANTES -->
+        <!-- -------------------------------------------------------------------------------------- -->
+        <section id="sec-pressao" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 print-section relative overflow-hidden">
+            <div class="absolute right-0 top-0 text-[100px] font-black text-white/[0.01] select-none pointer-events-none uppercase tracking-tighter">
+                Pressão
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-black text-[#D8F22A]">05.</span>
+                    <div>
+                        <h2 class="text-base font-bold uppercase tracking-wide text-white">Estatísticas de Pontos Importantes</h2>
+                        <p class="text-[10px] text-zinc-400">Comportamento sob pressão (30x30, 40x40, Breakpoints, Matchpoints e Viradas)</p>
+                    </div>
+                </div>
+                <span class="text-[9px] bg-rose-500/10 text-rose-400 px-2.5 py-0.5 rounded border border-rose-500/20 uppercase font-bold tracking-wider">Pontos Críticos</span>
+            </div>
+
+            <!-- Filtros Seção 5 -->
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 no-print">
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Dupla Selecionada *</label>
+                    <select id="s5-filtro-dupla" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white font-medium focus:outline-none focus:border-[#D8F22A]" onchange="atualizarEstatisticasPressao()">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogo</label>
+                    <select id="s5-filtro-jogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasPressao()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Torneio</label>
+                    <select id="s5-filtro-torneio" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white focus:outline-none" onchange="atualizarEstatisticasPressao()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="s5-render" class="space-y-4">
+                <div class="py-8 text-center bg-zinc-900/50 border border-dashed border-zinc-800 rounded-xl">
+                    <p class="text-xs text-zinc-400">Selecione uma <strong class="text-white">Dupla Selecionada *</strong> nos filtros acima para analisar os pontos de pressão.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- -------------------------------------------------------------------------------------- -->
+        <!-- SEÇÃO 7: SEQUÊNCIA DE JOGO (Linha do Tempo Completa) -->
+        <!-- -------------------------------------------------------------------------------------- -->
+        <section id="sec-sequencia" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 print-section relative overflow-hidden">
+            <div class="absolute right-0 top-0 text-[100px] font-black text-white/[0.01] select-none pointer-events-none uppercase tracking-tighter">
+                Sequência
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-black text-[#D8F22A]">06.</span>
+                    <div>
+                        <h2 class="text-base font-bold uppercase tracking-wide text-white">Sequência do Jogo</h2>
+                        <p class="text-[10px] text-zinc-400">Evolução ponto a ponto com altura representando o rali e marcadores de game</p>
+                    </div>
+                </div>
+                <span class="text-[9px] bg-amber-500/10 text-amber-400 px-2.5 py-0.5 rounded border border-amber-500/20 uppercase font-bold tracking-wider">Histórico</span>
+            </div>
+
+            <!-- Filtros Seção 6 -->
+            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 no-print">
+                <div>
+                    <label class="block text-[9px] text-zinc-400 uppercase tracking-wider mb-1 font-bold">Jogo Selecionado *</label>
+                    <select id="s6-filtro-jogo" class="w-full bg-black border border-zinc-800 rounded-lg text-xs px-2 py-2 text-white font-medium focus:outline-none focus:border-[#D8F22A]" onchange="atualizarSequenciaJogo()">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div class="flex items-center text-xs text-zinc-500 pt-4 sm:pt-6">
+                    <i data-lucide="info" class="w-4 h-4 text-[#D8F22A] mr-2 shrink-0"></i>
+                    <span>Cada barra representa um ponto. Clique na barra para abrir a ficha técnica detalhada.</span>
+                </div>
+            </div>
+
+            <div id="s6-render" class="space-y-4">
+                <div class="py-8 text-center bg-zinc-900/50 border border-dashed border-zinc-800 rounded-xl">
+                    <p class="text-xs text-zinc-400">Selecione o <strong class="text-white">Jogo *</strong> para renderizar a linha do tempo ponto a ponto.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- BOTÕES DO FINAL DA PÁGINA (Apenas visíveis na tela) -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center py-10 border-t border-zinc-800 no-print">
+            <button onclick="window.print()" class="bg-[#D8F22A] hover:bg-[#c2da23] text-black text-xs font-black py-4 px-10 rounded-xl transition-all shadow-lg active:scale-95">
+                Exportar Relatório PDF / Imprimir
+            </button>
+            <button onclick="voltarParaUpload()" class="bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white text-xs font-semibold py-4 px-10 rounded-xl border border-zinc-800 transition-all">
+                Voltar e Carregar Outro CSV
+            </button>
+        </div>
+
+    </div>
+
+    <!-- MODAL 1: DETALHES DE PONTOS IMPORTANTES -->
+    <div id="modal-pontos" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm no-print">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
+            <div class="bg-zinc-900 px-6 py-4 flex items-center justify-between border-b border-zinc-800">
+                <h3 id="modal-pontos-title" class="text-xs font-bold text-white uppercase tracking-wider">Estatísticas de Pontos</h3>
+                <button onclick="fecharModalPontos()" class="text-zinc-400 hover:text-white text-sm font-bold">✕</button>
+            </div>
+            <div id="modal-pontos-content" class="p-6 overflow-y-auto max-h-[400px] space-y-3">
+                <!-- Injetado dinamicamente -->
+            </div>
+            <div class="bg-zinc-900 px-6 py-4 flex justify-end border-t border-zinc-800">
+                <button onclick="fecharModalPontos()" class="bg-zinc-800 hover:bg-zinc-750 text-white px-4 py-2 rounded-lg text-xs font-semibold">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: DETALHES DA TIMELINE (PONTO INDIVIDUAL) -->
+    <div id="modal-timeline" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm no-print">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="bg-zinc-900 px-6 py-4 flex items-center justify-between border-b border-zinc-800">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider">Ficha Completa do Ponto</h3>
+                <button onclick="fecharModalTimeline()" class="text-zinc-400 hover:text-white text-sm font-bold">✕</button>
+            </div>
+            <div id="modal-timeline-content" class="p-6 space-y-4 text-xs">
+                <!-- Injetado dinamicamente -->
+            </div>
+            <div class="bg-zinc-900 px-6 py-4 flex justify-end border-t border-zinc-800">
+                <button onclick="fecharModalTimeline()" class="bg-zinc-800 hover:bg-zinc-750 text-white px-4 py-2 rounded-lg text-xs font-semibold">Fechar Ficha</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
